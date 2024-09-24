@@ -1,0 +1,23 @@
+diff --git a/madgraph/interface/madgraph_interface.py b/madgraph/interface/madgraph_interface.py
+index b00f516..bb4bdd4 100755
+--- a/madgraph/interface/madgraph_interface.py
++++ b/madgraph/interface/madgraph_interface.py
+@@ -8121,7 +8121,7 @@ in the MG5aMC option 'samurai' (instead of leaving it to its default 'auto')."""
+                     elif value < 0:
+                         raise Exception, 'Partial width for %s > %s negative: %s' % \
+                                        (particle.get('name'), ' '.join([p.get('name') for p in mode]), value)
+-                    elif 0 < value < 0.1 and particle['color'] !=1:
++                    elif 0 < value < 0.001 and particle['color'] !=1:
+                         logger.warning("partial width of particle %s lower than QCD scale:%s. Set it to zero. (%s)" \
+                                    % (particle.get('name'), value, decay_to))
+                         value = 0
+@@ -8210,7 +8210,7 @@ in the MG5aMC option 'samurai' (instead of leaving it to its default 'auto')."""
+             for BR in param['decay'].decay_table[pid]:
+                 if len(BR.lhacode) == 3 and skip_2body:
+                     continue
+-                if 0 < BR.value * width <0.1 and particle['color'] !=1:
++                if 0 < BR.value * width <0.001 and particle['color'] !=1:
+                     logger.warning("partial width of particle %s lower than QCD scale:%s. Set it to zero. (%s)" \
+                                    % (particle.get('name'), BR.value * width, BR.lhacode[1:]))
+
+
