@@ -15,67 +15,62 @@
 #./gridpack_generation.sh tt012j_bdbar_2l_FxFx cards/tt012j_2l_FxFx/tt012j_bdbar_2l_FxFx
 
 gridpack_script="./gridpack_generation.sh"
-path_ttbar="$PWD/cards/Run2UL_TTBar"
-path_ttbar="cards/Run2UL_TTBar"
+path_ttbar="$PWD/cards/Run2UL_TTBar/13TeV"
+path_ttbar="cards/Run2UL_TTBar/13TeV"
 
-parton_flavor=( "BBbar" "BSbar" "SBbar" "BDbar" "DBbar" )
-channel=( "2L2Nu" "SemiLeptonicPL" "SemiLeptonicML" "Hadronic" )
-other_setup="TuneCP5_13TeV-amcatnloFxFx-pythia8"
+parton_flavor=( "bbbar" "bsbar" "sbbar" "bdbar" "dbbar" )
+channel=( "2l" "1lp" "1lm" "0l" )
+other_setup="5f_ckm_NLO_FXFX_NNPDF3p1"
+
+uncs=( "nominal" "mtop171p5" "mtop173p5" )
 
 patch_path="$PWD/patches/decay_threshold.patch"
 
-for ch in ${channel[@]}; do
-  for flav in ${parton_flavor[@]}; do
-    if [[ ${ch} == "SemiLeptonicPL" ]]; then
-      proc="TTToSemiLeptonic${flav}PL_${other_setup}"
-    elif [[ ${ch} == "SemiLeptonicML" ]]; then
-      proc="TTToSemiLeptonic${flav}ML_${other_setup}"
-    else
-      proc="TTTo${ch}${flav}_${other_setup}"
-    fi
+#drwxr-xr-x 2 wjang zh 266 Oct  5 00:29 cards/Run2UL_TTBar/13TeV/tt012j_1lm_NLO_FXFX_NNPDF3p1/tt012j_bbbar_1lm_5f_ckm_NLO_FXFX_NNPDF3p1
+#drwxr-xr-x 2 wjang zh 306 Oct  5 00:29 cards/Run2UL_TTBar/13TeV/tt012j_1lm_NLO_FXFX_NNPDF3p1/tt012j_bbbar_1lm_mtop169p5_5f_ckm_NLO_FXFX_NNPDF3p1
+#drwxr-xr-x 2 wjang zh 306 Oct  5 00:29 cards/Run2UL_TTBar/13TeV/tt012j_1lm_NLO_FXFX_NNPDF3p1/tt012j_bbbar_1lm_mtop171p5_5f_ckm_NLO_FXFX_NNPDF3p1
+#drwxr-xr-x 2 wjang zh 306 Oct  5 00:29 cards/Run2UL_TTBar/13TeV/tt012j_1lm_NLO_FXFX_NNPDF3p1/tt012j_bbbar_1lm_mtop173p5_5f_ckm_NLO_FXFX_NNPDF3p1
+#drwxr-xr-x 2 wjang zh 306 Oct  5 00:29 cards/Run2UL_TTBar/13TeV/tt012j_1lm_NLO_FXFX_NNPDF3p1/tt012j_bbbar_1lm_mtop175p5_5f_ckm_NLO_FXFX_NNPDF3p1
 
-    echo "------------ START ${proc} -------------"
+for unc in ${uncs[@]}; do
+  for ch in ${channel[@]}; do
+    proc_cat="tt012j_${ch}_${other_setup}"
+    for flav in ${parton_flavor[@]}; do
+      proc="tt012j_${flav}_${ch}_${other_setup}"
 
-    if [[ -d GRIDPACK_TT/${proc} || -d ./${proc} ]]; then
-      echo "=====================> ${proc} was already produced, skip this"
-      continue
-    fi
+      if [[ ${unc} != "nominal" ]]; then
+        proc=${proc//${other_setup}/${unc}_${other_setup}}
+        if [[ ${flav} =~ "d" ]]; then
+          continue
+        fi
+      fi
 
-
-    if [[ ${flav} =~ "D" ]]; then
-      echo "======================> Patch decay width and BR values less than QCD scale for allowing tdW decays"
-      patch_cmd="cp $PWD/patches_for_private/tdW_decay_threshold.patch ${patch_path}"
-    else
-      echo "======================> Patch decay width and BR values less than QCD scale for allowing tsW decays (This patch is also applied to bbbar case for consistency)"
-      patch_cmd="cp $PWD/patches_for_private/tsW_decay_threshold.patch ${patch_path}"
-    fi
-
-    echo "======================> ${patch_cmd}"
-    $patch_cmd
-
-    cmd="${gridpack_script} ${proc} ${path_ttbar}/${proc//[A-Z][A-Z]bar/QQbar}/${proc}"
-    $cmd
-
-    echo "=========================> Clean up user-specific patches: ${patch_path}"
-    #rm $PWD/patches/0031-fix_madspin_when_msdir_activated.patch
-    rm $PWD/patches/decay_threshold.patch
+      echo "------------ START ${proc} -------------"
+  
+      if [[ -d GRIDPACK_TT/${proc} || -d ./${proc} ]]; then
+        echo "=====================> ${proc} was already produced, skip this"
+        continue
+      fi
+  
+  
+      if [[ ${flav} =~ "d" ]]; then
+        echo "======================> Patch decay width and BR values less than QCD scale for allowing tdW decays"
+        patch_cmd="cp $PWD/patches_for_private/tdW_decay_threshold.patch ${patch_path}"
+      else
+        echo "======================> Patch decay width and BR values less than QCD scale for allowing tsW decays (This patch is also applied to bbbar case for consistency)"
+        patch_cmd="cp $PWD/patches_for_private/tsW_decay_threshold.patch ${patch_path}"
+      fi
+  
+      echo "======================> ${patch_cmd}"
+      $patch_cmd
+  
+      cmd="${gridpack_script} ${proc} ${path_ttbar}/${proc_cat}/${proc}"
+      $cmd
+  
+      echo "=========================> Clean up user-specific patches: ${patch_path}"
+      #rm $PWD/patches/0031-fix_madspin_when_msdir_activated.patch
+      rm $PWD/patches/decay_threshold.patch
+    done
   done
 done
 
-#./gridpack_generation.sh TTTo2L2NuBBbar_TuneCP5_13TeV-amcatnloFxFx-pythia8 ${path_ttbar}/TTTo2L2NuQQBar_TuneCP5_13TeV_amcatnloFxFx-pythia8/TTTo2L2NuBBbar_TuneCP5_13TeV-amcatnloFxFx-pythia8
-#./gridpack_generation.sh TTTo2L2NuBSbar_TuneCP5_13TeV-amcatnloFxFx-pythia8 ${path_ttbar}/TTTo2L2NuQQBar_TuneCP5_13TeV_amcatnloFxFx-pythia8/TTTo2L2NuBSbar_TuneCP5_13TeV-amcatnloFxFx-pythia8
-#./gridpack_generation.sh TTTo2L2NuSBbar_TuneCP5_13TeV-amcatnloFxFx-pythia8 ${path_ttbar}/TTTo2L2NuQQBar_TuneCP5_13TeV_amcatnloFxFx-pythia8/TTTo2L2NuSBbar_TuneCP5_13TeV-amcatnloFxFx-pythia8
-#./gridpack_generation.sh TTTo2L2NuBDbar_TuneCP5_13TeV-amcatnloFxFx-pythia8 ${path_ttbar}/TTTo2L2NuQQBar_TuneCP5_13TeV_amcatnloFxFx-pythia8/TTTo2L2NuBDbar_TuneCP5_13TeV-amcatnloFxFx-pythia8
-#./gridpack_generation.sh TTTo2L2NuDBbar_TuneCP5_13TeV-amcatnloFxFx-pythia8 ${path_ttbar}/TTTo2L2NuQQBar_TuneCP5_13TeV_amcatnloFxFx-pythia8/TTTo2L2NuDBbar_TuneCP5_13TeV-amcatnloFxFx-pythia8
-#
-#./gridpack_generation.sh TTTo2L2NuBBbar_TuneCP5_13TeV-amcatnloFxFx-pythia8 ${path_ttbar}/TTTo2L2NuQQBar_TuneCP5_13TeV_amcatnloFxFx-pythia8/TTTo2L2NuBBbar_TuneCP5_13TeV-amcatnloFxFx-pythia8
-#./gridpack_generation.sh TTTo2L2NuBSbar_TuneCP5_13TeV-amcatnloFxFx-pythia8 ${path_ttbar}/TTTo2L2NuQQBar_TuneCP5_13TeV_amcatnloFxFx-pythia8/TTTo2L2NuBSbar_TuneCP5_13TeV-amcatnloFxFx-pythia8
-#./gridpack_generation.sh TTTo2L2NuSBbar_TuneCP5_13TeV-amcatnloFxFx-pythia8 ${path_ttbar}/TTTo2L2NuQQBar_TuneCP5_13TeV_amcatnloFxFx-pythia8/TTTo2L2NuSBbar_TuneCP5_13TeV-amcatnloFxFx-pythia8
-#./gridpack_generation.sh TTTo2L2NuBDbar_TuneCP5_13TeV-amcatnloFxFx-pythia8 ${path_ttbar}/TTTo2L2NuQQBar_TuneCP5_13TeV_amcatnloFxFx-pythia8/TTTo2L2NuBDbar_TuneCP5_13TeV-amcatnloFxFx-pythia8
-#./gridpack_generation.sh TTTo2L2NuDBbar_TuneCP5_13TeV-amcatnloFxFx-pythia8 ${path_ttbar}/TTTo2L2NuQQBar_TuneCP5_13TeV_amcatnloFxFx-pythia8/TTTo2L2NuDBbar_TuneCP5_13TeV-amcatnloFxFx-pythia8
-#
-#./gridpack_generation.sh TTTo2L2NuBBbar_TuneCP5_13TeV-amcatnloFxFx-pythia8 ${path_ttbar}/TTTo2L2NuQQBar_TuneCP5_13TeV_amcatnloFxFx-pythia8/TTTo2L2NuBBbar_TuneCP5_13TeV-amcatnloFxFx-pythia8
-#./gridpack_generation.sh TTTo2L2NuBSbar_TuneCP5_13TeV-amcatnloFxFx-pythia8 ${path_ttbar}/TTTo2L2NuQQBar_TuneCP5_13TeV_amcatnloFxFx-pythia8/TTTo2L2NuBSbar_TuneCP5_13TeV-amcatnloFxFx-pythia8
-#./gridpack_generation.sh TTTo2L2NuSBbar_TuneCP5_13TeV-amcatnloFxFx-pythia8 ${path_ttbar}/TTTo2L2NuQQBar_TuneCP5_13TeV_amcatnloFxFx-pythia8/TTTo2L2NuSBbar_TuneCP5_13TeV-amcatnloFxFx-pythia8
-#./gridpack_generation.sh TTTo2L2NuBDbar_TuneCP5_13TeV-amcatnloFxFx-pythia8 ${path_ttbar}/TTTo2L2NuQQBar_TuneCP5_13TeV_amcatnloFxFx-pythia8/TTTo2L2NuBDbar_TuneCP5_13TeV-amcatnloFxFx-pythia8
-#./gridpack_generation.sh TTTo2L2NuDBbar_TuneCP5_13TeV-amcatnloFxFx-pythia8 ${path_ttbar}/TTTo2L2NuQQBar_TuneCP5_13TeV_amcatnloFxFx-pythia8/TTTo2L2NuDBbar_TuneCP5_13TeV-amcatnloFxFx-pythia8
