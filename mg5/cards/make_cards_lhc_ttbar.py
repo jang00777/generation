@@ -40,9 +40,11 @@ elif "MLM" in name_acc: ickkw = 1
 else:                   ickkw = 0
 
 if opts.path == None:
-    base_path = f"{os.environ['PWD']}/{name_energy}/{name_proc}{name_addjet}_{channel}_{name_acc}_{name_pdf}"
+    base_path = f"{os.environ['PWD']}/{name_energy}/{name_proc}{name_addjet}_{channel}_{name_flav}_{name_module}_{name_acc}_{name_pdf}"
 else:
     base_path = opts.path
+
+base_path = base_path.replace("__", "_")
 
 madspin_wdecay = ""
 if channel == "2l":    madspin_wdecay="define decay_t = ell+ ell- nu nubar\ndefine decay_tbar = ell+ ell- nu nubar"
