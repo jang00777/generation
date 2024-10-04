@@ -1,72 +1,70 @@
-#!/bin/sh
+import os
+#import optparse as op
+import argparse as ap
 
+parser = ap.ArgumentParser()
+parser.add_argument("-p", "--process", default="tt", dest="proc")
+parser.add_argument("-j", "--additional_jet", default=2, dest="addjet", type=int)
+parser.add_argument("-s", "--subproc", default="bbbar", dest="subproc")
+parser.add_argument("-c", "--channel", default="2l", dest="channel")
+parser.add_argument("-f", "--max_flavour", default=5, dest="flav", type=int)
+parser.add_argument("-m", "--import_module", default="loop_sm-ckm_no_b_mass", dest="module")
+parser.add_argument("-a", "--accuracy", default="NLO_FXFX", dest="acc")
+parser.add_argument("-n", "--nevents", default=2000, type=int)
+parser.add_argument("-e", "--energy", default=13, type=float)
+parser.add_argument("--pdf", default="NNPDF3p1", dest="pdf")
+parser.add_argument("--set_params", nargs="+", default=[])
+parser.add_argument("--path", default=None)
+#opts, args = parser.parse_args()
+opts = parser.parse_args()
 
-echo "================Make MG5 generation cards================="
-echo "date: $(date)"
-echo "hostname: $(hostname)"
-echo "whoami: $(whoami)"
-echo "pwd: $(pwd)"
+#################################################################################################
 
-ls -al
+name_proc = opts.proc
+name_addjet = "".join([str(ij) for ij in range(opts.addjet+1)])+"j"
+name_subproc = opts.subproc
+channel = opts.channel
+name_flav = f"{opts.flav}f"
+name_module = ""
+name_acc = opts.acc
+name_pdf = opts.pdf
 
-#TIME_NOW="$(date +"%x %r %Z")"
-#TIME_STAMP="Updated on $TIME_NOW by $USER"
+nevents = opts.nevents
+beam_energy = int((opts.energy*1000)/2.) # in GeV
+name_energy = f"{str(opts.energy).replace('.','p').replace('p0','')}TeV"
 
-##### Functions
+if "ckm" in opts.module: name_module = "ckm"
 
-usage()
-{
-    echo "usage: make_cards_lhc.sh [[[-p/--process <PROCESS>] [-n/--nevent <NEVENT> ] [-e/--energy <ENERGY_IN_TEV>] [-u/--uncertainty <UNCERTAINTY>] | [-h/--help]]"
-}
+if "FXFX" in name_acc:  ickkw = 3
+elif "MLM" in name_acc: ickkw = 1
+else:                   ickkw = 0
 
-# Currently process option is not implemented yet
-process="ttbar"
-nevents=2000
-energy=13
-unc="nominal"
+if opts.path == None:
+    base_path = f"{os.environ['PWD']}/{name_energy}/{name_proc}{name_addjet}_{channel}_{name_acc}_{name_pdf}"
+else:
+    base_path = opts.path
 
-while [ "$1" != "" ]; do
-    case $1 in
-        -p | --process)         shift
-                                process=$1
-                                echo "process_to_generate = ${process}"
-                                ;;
-        -n | --nevents)         shift
-                                nevents=$1
-                                echo "events_to_generate = ${nevents}"
-                                ;;
-        -e | --energy)          shift
-                                energy=$1
-                                echo "sqrt(s) = ${energy} TeV"
-                                ;;
-        -u | --uncertainty)     shift
-                                unc=$1
-                                echo "uncertainty = ${unc}"
-                                ;;
-        -h | --help )           usage
-                                exit
-                                ;;
-        * )                     usage
-                                exit 1
-    esac
-    shift
-done
+madspin_wdecay = ""
+if channel == "2l":    madspin_wdecay="define decay_t = ell+ ell- nu nubar\ndefine decay_tbar = ell+ ell- nu nubar"
+elif channel == "1lp": madspin_wdecay="define decay_t = ell+ ell- nu nubar\ndefine decay_tbar = j"
+elif channel == "1lm": madspin_wdecay="define decay_t = j\ndefine decay_tbar = ell+ ell- nu nubar"
+elif channel == "0l":  madspin_wdecay="define decay_t = j\ndefine decay_tbar = j"
+elif channel == "inclusive": madspin_wdecay="define decay_t = j ell+ ell- nu nubar\ndefine decay_tbar = j ell+ ell- nu nubar"
+else:
+    print("Process name should include description of final state channel !!! 2l (dilepton) / 1lp or 1lm (lepton+jet) / 0l (All-jet) / inclusive (All)")
+    print("Also, semileptonic process should include sign of lepton !!! 1lp: t -> W+- > l+ nu / 1lm: tbar -> W- -> l- nu")
+    exit()
 
-energy_beam1_gev=$( echo "scale=0; ${energy}*1000/2" | bc )
-energy_beam2_gev=$( echo "scale=0; ${energy}*1000/2" | bc )
-energy_title=${energy//./p}
+# bbbar / bsbar/ sbbar / bdbar / dbbar
+tq = name_subproc.split("bar")[0][0]
+tqbar = name_subproc.split("bar")[0][1]
+madspin_decays_t = f"decay t > w+ {tq}, w+ > decay_t decay_t"
+madspin_decays_tbar = f"decay t~ > w- {tqbar}~, w- > decay_tbar decay_tbar"
 
+#################################################################################################
 
-#proc_list=(
-#  "TTTo2L2NuBBbar_TuneCP5_13TeV-amcatnloFxFx-pythia8"
-#  "TTToSemiLeptonicBBbarPL_TuneCP5_13TeV-amcatnloFxFx-pythia8"
-#  "TTToSemiLeptonicBBbarML_TuneCP5_13TeV-amcatnloFxFx-pythia8"
-#  "TTToHadronicBBbar_TuneCP5_13TeV-amcatnloFxFx-pythia8"
-#)
-
-script_proc_card="
-#import model loop_sm-no_b_mass
-import model loop_sm-ckm_no_b_mass
+default_proc_card=f"""
+import model {opts.module}
 
 define p = u d c s b u~ d~ c~ s~ b~ g
 define j = p
@@ -76,18 +74,19 @@ define nu = ve vm vt
 define nubar = ve~ vm~ vt~
 
 generate p p > t t~ [QCD] @0
-add process p p > t t~ j [QCD] @1
-add process p p > t t~ j j [QCD] @2
-"
+"""
+#"""
+#add process p p > t t~ j [QCD] @1
+#add process p p > t t~ j j [QCD] @2
+#"""
 
-script_customizedcards="
-#put card customizations here (change top and higgs mass for example)
+default_customizedcards="""
 set param_card mass 6 172.5
 set param_card mass 25 125.0
 set param_card yukawa 6 172.5
-"
+"""
 
-script_run_card="
+default_run_card=f"""
 #***********************************************************************
 #                        MadGraph5_aMC@NLO                             *
 #                                                                      *
@@ -115,7 +114,7 @@ script_run_card="
 # (relative) accuracy on the Xsec.                                     *
 # These values are ignored for fixed order runs                        *
 #***********************************************************************
-  ${nevents} = nevents ! Number of unweighted events requested
+  {nevents} = nevents ! Number of unweighted events requested
  0.001 = req_acc ! Required accuracy (-1=auto determined from nevents)
   -1 = nevt_job! Max number of events per job in event generation.
                  !  (-1= no split).
@@ -139,13 +138,13 @@ average = event_norm ! Normalize events to sum or average to the X sect.
 #***********************************************************************
     1   = lpp1    ! beam 1 type (0 = no PDF)
     1   = lpp2    ! beam 2 type (0 = no PDF)
- ${energy_beam1_gev}   = ebeam1  ! beam 1 energy in GeV
- ${energy_beam2_gev}   = ebeam2  ! beam 2 energy in GeV
+ {beam_energy}   = ebeam1  ! beam 1 energy in GeV
+ {beam_energy}   = ebeam2  ! beam 2 energy in GeV
 #***********************************************************************
 # PDF choice: this automatically fixes also alpha_s(MZ) and its evol.  *
 #***********************************************************************
  lhapdf    = pdlabel   ! PDF set
- \$DEFAULT_PDF_SETS    = lhaid     ! if pdlabel=lhapdf, this is the lhapdf number
+ $DEFAULT_PDF_SETS    = lhaid     ! if pdlabel=lhapdf, this is the lhapdf number
 #***********************************************************************
 # Include the NLO Monte Carlo subtr. terms for the following parton    *
 # shower (HERWIG6 | HERWIGPP | PYTHIA6Q | PYTHIA6PT | PYTHIA8)         *
@@ -188,7 +187,7 @@ average = event_norm ! Normalize events to sum or average to the X sect.
 # After showering an MLM-type merging should be applied as well.       *
 # See http://amcatnlo.cern.ch/FxFx_merging.htm for more details.       *
 #***********************************************************************
- 3        = ickkw            ! 0 no merging, 3 FxFx merging
+ {ickkw}        = ickkw            ! 0 no merging, 3 FxFx merging
 #***********************************************************************
 #
 #***********************************************************************
@@ -230,66 +229,11 @@ average = event_norm ! Normalize events to sum or average to the X sect.
 # Maximal PDG code for quark to be considered a jet when applying cuts.*
 # At least all massless quarks of the model should be included here.   *
 #***********************************************************************
- 5 = maxjetflavor
+ {opts.flav} = maxjetflavor
 #***********************************************************************
-"
+"""
 
-function write_scripts() {
-  local process=$1
-  local unc=$2
-  local base_path=$3
-
-  path_to_write=${base_path}/${process//[A-Z][A-Z]bar/QQbar}/${process}
-  if [[ ! -d ${path_to_write} ]]; then
-    echo "No directory of ${path_to_write} ---> Create it"
-    mkdir -p ${path_to_write}
-  fi
-
-  # Default - None
-  madspin_wdecay=""
-
-  if [[ ${process} =~ "2L2Nu" ]]; then
-    madspin_wdecay="define decay_t = ell+ ell- nu nubar\ndefine decay_tbar = ell+ ell- nu nubar"
-  elif [[ ${process} =~ "SemiLeptonic" ]]; then
-    if [[ ${process} =~ "PL_" ]]; then
-      madspin_wdecay="define decay_t = ell+ ell- nu nubar\ndefine decay_tbar = j"
-    elif [[ ${process} =~ "ML_" ]]; then
-      madspin_wdecay="define decay_t = j\ndefine decay_tbar = ell+ ell- nu nubar"
-    else
-      echo "Semileptonic process shoud include sign of lepton !!! TTToSemiLeptonic*PL(ML)_* (PL: t -> W+- > l+ nu / ML: tbar -> W- -> l- nu)"
-      exit 8
-    fi
-  elif [[ ${process} =~ "Hadronic" ]]; then
-    madspin_wdecay="define decay_t = j\ndefine decay_tbar = j"
-  elif [[ ${process} =~ "Inclusive" ]]; then
-    madspin_wdecay="define decay_t = j ell+ ell- nu nubar\ndefine decay_tbar = j ell+ ell- nu nubar"
-  else
-    echo "process name should include description of final state channel !!! TTTo2L2Nu* (DL) / TTToSemiLeptonic* (SL) / TTToHadronic* (HAD) / TTToInclusive (All)"
-    exit 9
-  fi
-
-  # Default - None
-  madspin_decays_t=""
-  madspin_decays_tbar=""
-
-  if [[ ${process} == TTTo*@(B?bar)* ]]; then
-    madspin_decays_t="decay t > w+ b, w+ > decay_t decay_t"
-  elif [[ ${process} == TTTo*@(S?bar)* ]]; then
-    madspin_decays_t="decay t > w+ s, w+ > decay_t decay_t"
-  elif [[ ${process} == TTTo*@(D?bar)* ]]; then
-    madspin_decays_t="decay t > w+ d, w+ > decay_t decay_t"
-  fi
-
-  if [[ ${process} == TTTo*@(?Bbar)* ]]; then
-    madspin_decays_tbar="decay t~ > w- b~, w- > decay_tbar decay_tbar"
-  elif [[ ${process} == TTTo*@(?Sbar)* ]]; then
-    madspin_decays_tbar="decay t~ > w- s~, w- > decay_tbar decay_tbar"
-  elif [[ ${process} == TTTo*@(?Dbar)* ]]; then
-    madspin_decays_tbar="decay t~ > w- d~, w- > decay_tbar decay_tbar"
-  fi
-
-
-  script_madspin_card="
+default_madspin_card=f"""
 #************************************************************
 #*                        MadSpin                           *
 #*                                                          *
@@ -312,58 +256,65 @@ set max_weight_ps_point 400  # number of PS to estimate the maximum for each eve
 #to properly limit the number of concurrent processes for grid running
 set max_running_process 1
 
-${madspin_wdecay}  
+{madspin_wdecay}
 
 # specify the decay for the final state particles
-${madspin_decays_t}
-${madspin_decays_tbar}
+{madspin_decays_t}
+{madspin_decays_tbar}
 
 # running the actual code
 launch
-"
- 
-  local local_script_proc_card="${script_proc_card}\noutput ${process} -nojpeg"
-  local local_script_customizedcards="${script_customizedcards}"
+"""
 
-  if [[ ${unc} =~ "mtop" ]]; then
-    changed_mass="${unc//mtop/}"
-    changed_mass="${changed_mass//p/.}"
-    local_script_customizedcards=${local_script_customizedcards//172.5/${changed_mass}}
-  fi
+#################################################################################################
 
-  echo -e "${local_script_proc_card}"       > ${path_to_write}/${process}_proc_card.dat
-  echo -e "${local_script_customizedcards}" > ${path_to_write}/${process}_customizecards.dat
-  echo -e "${script_madspin_card}"          > ${path_to_write}/${process}_madspin_card.dat
-  echo -e "${script_run_card}"              > ${path_to_write}/${process}_run_card.dat
-}
+proc_card = default_proc_card
+customizedcards = default_customizedcards
+run_card = default_run_card
+madspin_card = default_madspin_card
 
+sample_name = f"{name_proc}{name_addjet}_{name_subproc}_{channel}_{name_flav}_{name_module}_{name_acc}_{name_pdf}" 
+sample_name = sample_name.replace("__", "_")
 
-parton_flavor=( "BBbar" "BSbar" "SBbar" "BDbar" "DBbar" )
-channel=( "2L2Nu" "SemiLeptonicPL" "SemiLeptonicML" "Hadronic" )
-other_setup="TuneCP5_${energy_title}TeV-amcatnloFxFx-pythia8"
-base_path="$PWD/${energy_title}TeV"
+jet = "j "
+for ij in range(1, opts.addjet+1):
+  num = ij
+  add_jet = jet*ij
+  proc_card += f"add process p p > t t~ {add_jet}[QCD] @{num}\n"
 
-if [[ ! -d ${base_path} ]]; then
-  echo "Create ${base_path} for saving cards ..."
-  mkdir -p ${base_path}
-fi
+proc_card += f"output {sample_name} -nojpeg"
 
-for ch in ${channel[@]}; do
-  for flav in ${parton_flavor[@]}; do
-    if [[ ${ch} == "SemiLeptonicPL" ]]; then
-      proc="TTToSemiLeptonic${flav}PL_${other_setup}"
-    elif [[ ${ch} == "SemiLeptonicML" ]]; then
-      proc="TTToSemiLeptonic${flav}ML_${other_setup}"
-    else
-      proc="TTTo${ch}${flav}_${other_setup}"
-    fi
-    if [[ ${unc} != "nominal" ]]; then
-      proc=${proc//${other_setup}/${unc}_${other_setup}}
-    fi
-    write_scripts ${proc} ${unc} ${base_path}
-  done
-done
+name_mtop = ""
+if len(opts.set_params) > 0:
+    for param in opts.set_params:
+        if "mtop" in param:
+            new_mtop = param.split("mtop")[1].replace("p", ".")
+            customizedcards = customizedcards.replace("6 172.5", f"6 {new_mtop}")
+            name_mtop = param 
 
+if name_mtop != "":
+    sample_name = sample_name.replace(f"{channel}", f"{channel}_{name_mtop}")
 
+#################################################################################################
 
+path_to_write = f"{base_path}/{sample_name}/"
+if not os.path.exists(path_to_write):
+    print(f"There's no directory {path_to_write} ... make it")
+    os.makedirs(path_to_write, exist_ok=True)
 
+#################################################################################################
+
+name_run_card = f"{path_to_write}/{sample_name}_run_card.dat"
+name_proc_card = f"{path_to_write}/{sample_name}_proc_card.dat"
+name_customizedcards = f"{path_to_write}/{sample_name}_customizedcards.dat"
+name_madspin_card = f"{path_to_write}/{sample_name}_madspin_card.dat"
+
+def write_card(fname: str, contents: str):
+    f = open(fname, "w")
+    f.write(contents)
+    f.close()
+
+write_card(name_run_card, run_card)
+write_card(name_proc_card, proc_card)
+write_card(name_customizedcards, customizedcards)
+write_card(name_madspin_card, madspin_card)
