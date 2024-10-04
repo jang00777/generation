@@ -16,13 +16,14 @@ ls -al
 
 usage()
 {
-    echo "usage: make_cards_lhc.sh [[[-p/--process <PROCESS>] [-n/--nevent <NEVENT> ] [-e/--energy <ENERGY_IN_TEV>] | [-h/--help]]"
+    echo "usage: make_cards_lhc.sh [[[-p/--process <PROCESS>] [-n/--nevent <NEVENT> ] [-e/--energy <ENERGY_IN_TEV>] [-u/--uncertainty <UNCERTAINTY>] | [-h/--help]]"
 }
 
 # Currently process option is not implemented yet
 process="ttbar"
 nevents=2000
 energy=13
+unc="nominal"
 
 while [ "$1" != "" ]; do
     case $1 in
@@ -37,6 +38,10 @@ while [ "$1" != "" ]; do
         -e | --energy)          shift
                                 energy=$1
                                 echo "sqrt(s) = ${energy} TeV"
+                                ;;
+        -u | --uncertainty)     shift
+                                unc=$1
+                                echo "uncertainty = ${unc}"
                                 ;;
         -h | --help )           usage
                                 exit
@@ -80,9 +85,6 @@ script_customizedcards="
 set param_card mass 6 172.5
 set param_card mass 25 125.0
 set param_card yukawa 6 172.5
-#set wolfenstein elements high enough for t>sW to be generated (above QCD scale)
-# Sufficient to set lam (elt 1)
-#set param_card wolfenstein 1 0.85
 "
 
 script_run_card="
@@ -234,7 +236,8 @@ average = event_norm ! Normalize events to sum or average to the X sect.
 
 function write_scripts() {
   local process=$1
-  local base_path=$2
+  local unc=$2
+  local base_path=$3
 
   path_to_write=${base_path}/${process//[A-Z][A-Z]bar/QQbar}/${process}
   if [[ ! -d ${path_to_write} ]]; then
@@ -320,11 +323,18 @@ launch
 "
  
   local local_script_proc_card="${script_proc_card}\noutput ${process} -nojpeg"
+  local local_script_customizedcards="${script_customizedcards}"
 
-  echo -e "${local_script_proc_card}" > ${path_to_write}/${process}_proc_card.dat
-  echo -e "${script_customizedcards}" > ${path_to_write}/${process}_customizecards.dat
-  echo -e "${script_madspin_card}"    > ${path_to_write}/${process}_madspin_card.dat
-  echo -e "${script_run_card}"        > ${path_to_write}/${process}_run_card.dat
+  if [[ ${unc} =~ "mtop" ]]; then
+    changed_mass="${unc//mtop/}"
+    changed_mass="${changed_mass//p/.}"
+    local_script_customizedcards=${local_script_customizedcards//172.5/${changed_mass}}
+  fi
+
+  echo -e "${local_script_proc_card}"       > ${path_to_write}/${process}_proc_card.dat
+  echo -e "${local_script_customizedcards}" > ${path_to_write}/${process}_customizecards.dat
+  echo -e "${script_madspin_card}"          > ${path_to_write}/${process}_madspin_card.dat
+  echo -e "${script_run_card}"              > ${path_to_write}/${process}_run_card.dat
 }
 
 
@@ -347,7 +357,10 @@ for ch in ${channel[@]}; do
     else
       proc="TTTo${ch}${flav}_${other_setup}"
     fi
-    write_scripts ${proc} ${base_path}
+    if [[ ${unc} != "nominal" ]]; then
+      proc=${proc//${other_setup}/${unc}_${other_setup}}
+    fi
+    write_scripts ${proc} ${unc} ${base_path}
   done
 done
 
