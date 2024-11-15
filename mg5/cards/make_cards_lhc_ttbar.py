@@ -284,8 +284,6 @@ for ij in range(1, opts.addjet+1):
   add_jet = jet*ij
   proc_card += f"add process p p > t t~ {add_jet}[QCD] @{num}\n"
 
-proc_card += f"output {sample_name} -nojpeg"
-
 name_mtop = ""
 if len(opts.set_params) > 0:
     for param in opts.set_params:
@@ -296,6 +294,8 @@ if len(opts.set_params) > 0:
 
 if name_mtop != "":
     sample_name = sample_name.replace(f"{channel}", f"{channel}_{name_mtop}")
+
+proc_card += f"output {sample_name} -nojpeg"
 
 #################################################################################################
 
